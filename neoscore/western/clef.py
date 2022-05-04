@@ -1,6 +1,7 @@
 from typing import Optional
 
 from neoscore.core.brush import BrushDef
+from neoscore.core.layout_controllers import NewLine
 from neoscore.core.music_font import MusicFont
 from neoscore.core.music_text import MusicText
 from neoscore.core.pen import PenDef
@@ -103,15 +104,25 @@ class Clef(MusicText, StaffObject):
 
     ######## PRIVATE METHODS ########
 
-    def render_before_break(
-        self, local_start_x: Unit, start: Point, stop: Point, dist_to_line_start: Unit
+    def render_complete(
+        self,
+        pos: Point,
+        flowable_line: Optional[NewLine] = None,
+        flowable_x: Optional[Unit] = None,
     ):
-        super().render_complete(start)
+        fringe_layout = self.staff.fringe_layout_at(self.x)
+        super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
 
-    def render_after_break(self, local_start_x: Unit, start: Point):
-        super().render_complete(start)
+    def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
+        fringe_layout = self.staff.fringe_layout_at(self.x)
+        super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
 
     def render_spanning_continuation(
-        self, local_start_x: Unit, start: Point, stop: Point
+        self, pos: Point, flowable_line: NewLine, object_x: Unit
     ):
-        super().render_complete(start)
+        fringe_layout = self.staff.fringe_layout_at(self.x + object_x)
+        super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
+
+    def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
+        fringe_layout = self.staff.fringe_layout_at(self.x + object_x)
+        super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))

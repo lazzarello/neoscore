@@ -3,18 +3,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Type, cast
 
 from neoscore.core.exceptions import NoClefError
+from neoscore.core.has_music_font import HasMusicFont
+from neoscore.core.layout_controllers import MarginController, NewLine
 from neoscore.core.music_font import MusicFont
-from neoscore.core.music_path import MusicPath
-from neoscore.core.pen import Pen
-from neoscore.core.point import PointDef
+from neoscore.core.painted_object import PaintedObject
+from neoscore.core.path import Path
+from neoscore.core.pen import Pen, PenDef
+from neoscore.core.point import Point, PointDef
 from neoscore.core.positioned_object import PositionedObject
 from neoscore.core.units import ZERO, Mm, Unit, make_unit_class
+from neoscore.western.staff_fringe_layout import StaffFringeLayout
 
 if TYPE_CHECKING:
     from neoscore.western.clef import Clef
 
 
-class Staff(MusicPath):
+class Staff(PaintedObject, HasMusicFont):
     """A staff with decently high-level knowledge of its contents."""
 
     # Type sentinel used to hackily check if objects are Staff
@@ -29,7 +33,7 @@ class Staff(MusicPath):
         line_spacing: Unit = Mm(1.75),
         line_count: int = 5,
         music_font_family: str = "Bravura",
-        pen: Optional[Pen] = None,
+        pen: Optional[PenDef] = None,
     ):
         """
         Args:
@@ -46,18 +50,19 @@ class Staff(MusicPath):
                 thickness from the music font's engraving default.
         """
         unit = self._make_unit_class(line_spacing)
-        music_font = MusicFont(music_font_family, unit)
-        pen = pen or Pen(thickness=music_font.engraving_defaults["staffLineThickness"])
-        super().__init__(pos, parent, font=music_font, pen=pen)
+        self._music_font = MusicFont(music_font_family, unit)
+        pen = pen or Pen(
+            thickness=self._music_font.engraving_defaults["staffLineThickness"]
+        )
+        PaintedObject.__init__(self, pos, parent, pen=pen)
         self._line_count = line_count
         self._length = length
-        # Construct the staff path
-        for i in range(self.line_count):
-            y_offset = self.unit(i)
-            self.move_to(ZERO, y_offset)
-            self.line_to(length, y_offset)
 
     ######## PUBLIC PROPERTIES ########
+
+    @property
+    def music_font(self) -> MusicFont:
+        return self._music_font
 
     @property
     def height(self) -> Unit:
@@ -178,7 +183,67 @@ class Staff(MusicPath):
         else:
             return []
 
+    def fringe_layout_at(self, pos_x: Unit) -> StaffFringeLayout:
+        clef = self.active_clef_at(pos_x)
+        time_signature_fringe_pos = ZERO  # TODO
+        key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
+        clef_fringe_pos = key_signature_fringe_pos - clef.bounding_rect.width
+        staff_fringe_pos = clef_fringe_pos
+        return StaffFringeLayout(
+            staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
+        )
+
+    def render_slice(
+        self,
+        pos: Point,
+        clip_start_x: Optional[Unit] = None,
+        clip_width: Optional[Unit] = None,
+    ):
+        fringe_layout = self.fringe_layout_at(clip_start_x or ZERO)
+        if clip_width is None:
+            if clip_start_x is None:
+                slice_length = self.breakable_length
+            else:
+                slice_length = self.breakable_length - clip_start_x
+        else:
+            slice_length = clip_width
+        path = self._create_staff_segment_path(
+            Point(pos.x + fringe_layout.staff, pos.y),
+            slice_length - fringe_layout.staff,
+        )
+        path.render()
+        path.remove()
+
+    def render_complete(
+        self,
+        pos: Point,
+        flowable_line: Optional[NewLine] = None,
+        flowable_x: Optional[Unit] = None,
+    ):
+        self.render_slice(pos, None, None)
+
+    def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
+        self.render_slice(
+            pos, ZERO, flowable_line.flowable_x + flowable_line.length - flowable_x
+        )
+
+    def render_spanning_continuation(
+        self, pos: Point, flowable_line: NewLine, object_x: Unit
+    ):
+        self.render_slice(pos, object_x, flowable_line.length)
+
+    def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
+        self.render_slice(pos, object_x, None)
+
     ######## PRIVATE METHODS ########
+
+    def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
+        path = Path(doc_pos, None, pen=self.pen)
+        for i in range(self.line_count):
+            y_offset = self.unit(i)
+            path.move_to(ZERO, y_offset)
+            path.line_to(length, y_offset)
+        return path
 
     @staticmethod
     def _make_unit_class(staff_unit_size: Unit) -> Type[Unit]:
@@ -201,8 +266,23 @@ class Staff(MusicPath):
         result.sort(key=lambda tup: tup[0])
         return result
 
+    def _register_layout_controllers(self):
+        flowable = self.flowable
+        if not flowable:
+            return
+        staff_flowable_x = flowable.descendant_pos_x(self)
+        for clef_x, clef in self._clef_x_positions:
+            clef_flowable_x = staff_flowable_x + clef_x
+            clef_margin_needed = clef.bounding_rect.width
+            controller = MarginController(
+                clef_flowable_x, clef_margin_needed, "neoscore_clef"
+            )
+            flowable.add_margin_controller(controller)
+        # Do same for key signatures and time signatures
+
     def pre_render_hook(self):
         self._clef_x_positions = self._compute_clef_x_positions()
+        self._register_layout_controllers()
 
     def post_render_hook(self):
         self._clef_x_positions = None

@@ -1,9 +1,11 @@
 from typing import Optional, cast
 
 from neoscore.core.brush import BrushDef
+from neoscore.core.layout_controllers import NewLine
 from neoscore.core.music_font import MusicFont, MusicFontGlyphNotFoundError
 from neoscore.core.music_text import MusicText
 from neoscore.core.pen import PenDef
+from neoscore.core.point import Point
 from neoscore.core.text_alignment import AlignmentX
 from neoscore.core.units import Unit
 from neoscore.western.multi_staff_object import MultiStaffObject, StaffLike
@@ -85,11 +87,13 @@ class Brace(MultiStaffObject, MusicText):
 
     ######## PRIVATE METHODS ########
 
-    def render_before_break(self, local_start_x, start, stop, dist_to_line_start):
-        self.render_complete(start)
+    def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
+        self.render_complete(pos)
 
-    def render_after_break(self, local_start_x, start):
-        self.render_complete(start)
+    def render_spanning_continuation(
+        self, pos: Point, flowable_line: NewLine, object_x: Unit
+    ):
+        self.render_complete(pos)
 
-    def render_spanning_continuation(self, local_start_x, start, stop):
-        self.render_complete(start)
+    def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
+        self.render_complete(pos)

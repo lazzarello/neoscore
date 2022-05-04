@@ -1,6 +1,7 @@
 import warnings
 from typing import Optional, Union, cast
 
+from neoscore.core.layout_controllers import NewLine
 from neoscore.core.music_text import MusicText
 from neoscore.core.point import ORIGIN, Point
 from neoscore.core.positioned_object import PositionedObject
@@ -148,20 +149,20 @@ class _KeySignatureAccidental(MusicText, StaffObject):
     def render_complete(
         self,
         pos: Point,
-        dist_to_line_start: Optional[Unit] = None,
-        local_start_x: Optional[Unit] = None,
+        flowable_line: Optional[NewLine] = None,
+        flowable_x: Optional[Unit] = None,
     ):
-        self.render_occurrence(pos, local_start_x, cast(Unit, dist_to_line_start))
+        dist_to_line_start = cast(Unit, flowable_x) - flowable_line.flowable_x
+        self.render_occurrence(pos, flowable_x, dist_to_line_start)
 
-    def render_before_break(
-        self, local_start_x: Unit, start: Point, stop: Point, dist_to_line_start: Unit
-    ):
-        self.render_occurrence(start, local_start_x, dist_to_line_start)
-
-    def render_after_break(self, local_start_x: Unit, start: Point):
-        self.render_occurrence(start, local_start_x, ZERO)
+    def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
+        dist_to_line_start = cast(Unit, flowable_x) - flowable_line.flowable_x
+        self.render_occurrence(pos, flowable_x, dist_to_line_start)
 
     def render_spanning_continuation(
-        self, local_start_x: Unit, start: Point, stop: Point
+        self, pos: Point, flowable_line: NewLine, object_x: Unit
     ):
-        self.render_occurrence(start, local_start_x, ZERO)
+        self.render_occurrence(pos, flowable_line.x, ZERO)
+
+    def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
+        self.render_occurrence(pos, flowable_line.x, ZERO)
