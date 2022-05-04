@@ -57,6 +57,7 @@ class Staff(PaintedObject, HasMusicFont):
         PaintedObject.__init__(self, pos, parent, pen=pen)
         self._line_count = line_count
         self._length = length
+        self._fringe_layouts = {}
 
     ######## PUBLIC PROPERTIES ########
 
@@ -183,23 +184,27 @@ class Staff(PaintedObject, HasMusicFont):
         else:
             return []
 
-    def fringe_layout_at(self, pos_x: Unit) -> StaffFringeLayout:
-        clef = self.active_clef_at(pos_x)
-        time_signature_fringe_pos = ZERO  # TODO
-        key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
-        clef_fringe_pos = key_signature_fringe_pos - clef.bounding_rect.width
-        staff_fringe_pos = clef_fringe_pos
-        return StaffFringeLayout(
-            staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
-        )
+    def fringe_layout_at(self, location: NewLine | Unit) -> StaffFringeLayout:
+        if isinstance(location, NewLine):
+            cached_result = self._fringe_layouts.get(location)
+            if cached_result:
+                return cached_result
+            line_staff_pos_x = location.flowable_x - self.flowable.descendant_pos_x(
+                self
+            )
+            layout = self._fringe_layout_at_staff_pos_x(line_staff_pos_x)
+            self._fringe_layouts[location] = layout
+            return layout
+        return self._fringe_layout_at_staff_pos_x(location)
 
     def render_slice(
         self,
         pos: Point,
-        clip_start_x: Optional[Unit] = None,
-        clip_width: Optional[Unit] = None,
+        clip_start_x: Optional[Unit],
+        clip_width: Optional[Unit],
+        flowable_line: Optional[NewLine],
     ):
-        fringe_layout = self.fringe_layout_at(clip_start_x or ZERO)
+        fringe_layout = self.fringe_layout_at(flowable_line or ZERO)
         if clip_width is None:
             if clip_start_x is None:
                 slice_length = self.breakable_length
@@ -220,22 +225,36 @@ class Staff(PaintedObject, HasMusicFont):
         flowable_line: Optional[NewLine] = None,
         flowable_x: Optional[Unit] = None,
     ):
-        self.render_slice(pos, None, None)
+        self.render_slice(pos, None, None, flowable_line)
 
     def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
         self.render_slice(
-            pos, ZERO, flowable_line.flowable_x + flowable_line.length - flowable_x
+            pos,
+            ZERO,
+            flowable_line.flowable_x + flowable_line.length - flowable_x,
+            flowable_line,
         )
 
     def render_spanning_continuation(
         self, pos: Point, flowable_line: NewLine, object_x: Unit
     ):
-        self.render_slice(pos, object_x, flowable_line.length)
+        self.render_slice(pos, object_x, flowable_line.length, flowable_line)
 
     def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
-        self.render_slice(pos, object_x, None)
+        self.render_slice(pos, object_x, None, flowable_line)
 
     ######## PRIVATE METHODS ########
+
+    def _fringe_layout_at_staff_pos_x(self, pos_x: Unit) -> StaffFringeLayout:
+        clef = self.active_clef_at(pos_x)
+        clef_width = clef.bounding_rect.width if clef else ZERO
+        time_signature_fringe_pos = ZERO  # TODO
+        key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
+        clef_fringe_pos = key_signature_fringe_pos - clef_width
+        staff_fringe_pos = clef_fringe_pos
+        return StaffFringeLayout(
+            staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
+        )
 
     def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
         path = Path(doc_pos, None, pen=self.pen)

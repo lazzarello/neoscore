@@ -47,13 +47,25 @@ class SystemLine(MultiStaffObject, MusicPath):
         """
         return self.parent.breakable_length - self.x
 
+    def render_complete(
+        self,
+        pos: Point,
+        flowable_line: Optional[NewLine] = None,
+        flowable_x: Optional[Unit] = None,
+    ):
+        fringe_layout = self.highest.fringe_layout_at(flowable_line)
+        super().render_complete(Point(pos.x + fringe_layout.staff, pos.y))
+
     def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
-        self.render_complete(pos)
+        fringe_layout = self.highest.fringe_layout_at(flowable_line)
+        super().render_complete(Point(pos.x + fringe_layout.staff, pos.y))
 
     def render_spanning_continuation(
         self, pos: Point, flowable_line: NewLine, object_x: Unit
     ):
-        self.render_complete(pos)
+        fringe_layout = self.highest.fringe_layout_at(flowable_line)
+        super().render_complete(Point(pos.x + fringe_layout.staff, pos.y))
 
     def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
-        self.render_complete(pos)
+        fringe_layout = self.highest.fringe_layout_at(flowable_line)
+        super().render_complete(Point(pos.x + fringe_layout.staff, pos.y))

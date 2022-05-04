@@ -110,19 +110,19 @@ class Clef(MusicText, StaffObject):
         flowable_line: Optional[NewLine] = None,
         flowable_x: Optional[Unit] = None,
     ):
-        fringe_layout = self.staff.fringe_layout_at(self.x)
+        fringe_layout = self.staff.fringe_layout_at(flowable_line)
         super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
 
     def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
-        fringe_layout = self.staff.fringe_layout_at(self.x)
+        fringe_layout = self.staff.fringe_layout_at(flowable_line)
         super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
 
     def render_spanning_continuation(
         self, pos: Point, flowable_line: NewLine, object_x: Unit
     ):
-        fringe_layout = self.staff.fringe_layout_at(self.x + object_x)
+        fringe_layout = self.staff.fringe_layout_at(flowable_line)
         super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
 
     def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
-        fringe_layout = self.staff.fringe_layout_at(self.x + object_x)
+        fringe_layout = self.staff.fringe_layout_at(flowable_line)
         super().render_complete(Point(pos.x + fringe_layout.clef, pos.y))
