@@ -5,6 +5,7 @@ from neoscore.core.music_text import MusicText
 from neoscore.core.point import Point
 from neoscore.core.positioned_object import PositionedObject
 from neoscore.core.units import ZERO, Unit
+from neoscore.western import clef_type
 from neoscore.western.accidental_type import AccidentalType
 from neoscore.western.key_signature_type import KeySignatureType
 from neoscore.western.staff import Staff
@@ -21,6 +22,10 @@ class KeySignature(PositionedObject, StaffObject):
     and at the beginning of subsequent lines until a new
     ``KeySignature`` is encountered.
     """
+
+    # Type sentinel used to hackily check type
+    # without importing the type, risking cyclic imports.
+    _neoscore_key_signature_type_marker = True
 
     def __init__(
         self,
@@ -44,8 +49,6 @@ class KeySignature(PositionedObject, StaffObject):
             else KeySignatureType[key_signature_type.upper()]
         )
 
-    ######## PUBLIC PROPERTIES ########
-
     @property
     def key_signature_type(self) -> KeySignatureType:
         """KeySignatureType: A logical description of the key signature."""
@@ -55,6 +58,26 @@ class KeySignature(PositionedObject, StaffObject):
     def breakable_length(self) -> Unit:
         """Key signatures extend until another is found in the staff."""
         return self.staff.distance_to_next_of_type(self)
+
+    @property
+    def visual_width(self) -> Unit:
+        """The visual width of this key signature
+
+        This assumes that key signatures have the same width in any clef, and that the
+        accidentals used in key signatures are 0.5 staff units wide.
+        """
+        max_x = 0
+        for letter, accidental_type in self.key_signature_type.value.items():
+            if accidental_type is None:
+                continue
+            if accidental_type == AccidentalType.SHARP:
+                pos_tuple = clef_type.TREBLE.key_signature_sharp_layout[letter]
+            else:
+                pos_tuple = clef_type.TREBLE.key_signature_flat_layout[letter]
+            max_x = max(max_x, pos_tuple[0])
+        # Hackily assume final accidental width is 0.5 units (which is true for flats
+        # and sharps)
+        return self.staff.unit(max_x + 0.5)
 
     def render_occurrence(
         self, pos: Point, flowable_line: Optional[NewLine], for_line_start: bool

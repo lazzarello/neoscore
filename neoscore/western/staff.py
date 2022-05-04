@@ -25,6 +25,10 @@ class Staff(PaintedObject, HasMusicFont):
     # without importing the type, risking cyclic imports.
     _neoscore_staff_type_marker = True
 
+    # Padding on left side of staff before anything should come after it
+    # (in pseudo-staff-units)
+    _LEFT_PADDING = 0.5
+
     def __init__(
         self,
         pos: PointDef,
@@ -251,7 +255,7 @@ class Staff(PaintedObject, HasMusicFont):
         time_signature_fringe_pos = ZERO  # TODO
         key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
         clef_fringe_pos = key_signature_fringe_pos - clef_width
-        staff_fringe_pos = clef_fringe_pos - self.unit(0.5)
+        staff_fringe_pos = clef_fringe_pos - self.unit(Staff._LEFT_PADDING)
         return StaffFringeLayout(
             pos_x, staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
         )
@@ -290,13 +294,26 @@ class Staff(PaintedObject, HasMusicFont):
         if not flowable:
             return
         staff_flowable_x = flowable.descendant_pos_x(self)
-        for clef_x, clef in self._clef_x_positions:
-            clef_flowable_x = staff_flowable_x + clef_x
-            clef_margin_needed = clef.bounding_rect.width
-            controller = MarginController(
-                clef_flowable_x, clef_margin_needed, "neoscore_clef"
+        flowable.add_margin_controller(
+            MarginController(
+                staff_flowable_x, self.unit(Staff._LEFT_PADDING), "neoscore_staff"
             )
-            flowable.add_margin_controller(controller)
+        )
+        for clef_x, clef in self._clef_x_positions:
+            flowable_x = staff_flowable_x + clef_x
+            margin_needed = clef.bounding_rect.width
+            flowable.add_margin_controller(
+                MarginController(flowable_x, margin_needed, "neoscore_clef")
+            )
+        # Assume that in key signatures have the same width in all clefs
+        for keysig in self.descendants_with_attribute(
+            "_neoscore_key_signature_type_marker"
+        ):
+            flowable_x = staff_flowable_x + keysig.x
+            flowable.add_margin_controller(
+                MarginController(flowable_x, keysig.visual_width, "neoscore_keysig")
+            )
+
         # Do same for key signatures and time signatures
 
     def pre_render_hook(self):
