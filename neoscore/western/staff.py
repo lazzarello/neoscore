@@ -16,6 +16,7 @@ from neoscore.western.staff_fringe_layout import StaffFringeLayout
 
 if TYPE_CHECKING:
     from neoscore.western.clef import Clef
+    from neoscore.western.key_signature import KeySignature
 
 
 class Staff(PaintedObject, HasMusicFont):
@@ -138,13 +139,43 @@ class Staff(PaintedObject, HasMusicFont):
         cached_clef_positions = getattr(self, "_clef_x_positions", None)
         if cached_clef_positions:
             return cached_clef_positions
-        return self._compute_clef_x_positions()
+        result = [
+            (clef.pos_x_in_staff, clef)
+            for clef in self.descendants_with_attribute("middle_c_staff_position")
+        ]
+        result.sort(key=lambda tup: tup[0])
+        self._clef_x_positions = result
+        return result
 
     def active_clef_at(self, pos_x: Unit) -> Optional[Clef]:
         """Return the active clef at a given x position, if any."""
         clefs = self.clefs()
         return next(
             (clef for (clef_x, clef) in reversed(clefs) if clef_x <= pos_x),
+            None,
+        )
+
+    def key_signatures(self) -> list[tuple[Unit, KeySignature]]:
+        """All the key signatures in this staff, ordered by their relative x pos."""
+        cached_clef_positions = getattr(self, "_key_signature_x_positions", None)
+        if cached_clef_positions:
+            return cached_clef_positions
+        result = [
+            (sig.pos_x_in_staff, sig)
+            for sig in self.descendants_with_attribute(
+                "_neoscore_key_signature_type_marker"
+            )
+        ]
+        result.sort(key=lambda tup: tup[0])
+        self._key_signature_x_positions = result
+        return result
+
+    def active_key_signature_at(self, pos_x: Unit) -> Optional[KeySignature]:
+        """Return the active key signature at a given x position, if any."""
+
+        sigs = self.key_signatures()
+        return next(
+            (sig for (sig_x, sig) in reversed(sigs) if sig_x <= pos_x),
             None,
         )
 
@@ -251,9 +282,10 @@ class Staff(PaintedObject, HasMusicFont):
 
     def _fringe_layout_at_staff_pos_x(self, pos_x: Unit) -> StaffFringeLayout:
         clef = self.active_clef_at(pos_x)
+        key_sig = self.active_key_signature_at(pos_x)
         clef_width = clef.bounding_rect.width if clef else ZERO
         time_signature_fringe_pos = ZERO  # TODO
-        key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
+        key_signature_fringe_pos = time_signature_fringe_pos - key_sig.visual_width
         clef_fringe_pos = key_signature_fringe_pos - clef_width
         staff_fringe_pos = clef_fringe_pos - self.unit(Staff._LEFT_PADDING)
         return StaffFringeLayout(
@@ -281,14 +313,6 @@ class Staff(PaintedObject, HasMusicFont):
 
         return make_unit_class("StaffUnit", staff_unit_size.base_value)
 
-    def _compute_clef_x_positions(self) -> list[tuple[Unit, Clef]]:
-        result = [
-            (clef.pos_x_in_staff, clef)
-            for clef in self.descendants_with_attribute("middle_c_staff_position")
-        ]
-        result.sort(key=lambda tup: tup[0])
-        return result
-
     def _register_layout_controllers(self):
         flowable = self.flowable
         if not flowable:
@@ -314,11 +338,6 @@ class Staff(PaintedObject, HasMusicFont):
                 MarginController(flowable_x, keysig.visual_width, "neoscore_keysig")
             )
 
-        # Do same for key signatures and time signatures
-
     def pre_render_hook(self):
-        self._clef_x_positions = self._compute_clef_x_positions()
+        # TODO do these need to be cleaned up after rendering?
         self._register_layout_controllers()
-
-    def post_render_hook(self):
-        self._clef_x_positions = None

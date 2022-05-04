@@ -117,3 +117,15 @@ class TimeSignature(PositionedObject, HasMusicFont):
         else:
             # Widths are equal. No adjustment needed.
             self._width = upper_width
+        # Finally, if this time signature is placed at x=0 relative to a staff, adjust X
+        # to fit the staff's fringe layout. This is rather hacky...
+        staff = self.first_ancestor_with_attr("_neoscore_staff_type_marker")
+        if staff and staff.descendant_pos_x(self) == ZERO:
+            # TODO NEXT this doesn't quite work because it assumes text is left-aligned
+            # from the original pos when it's actually center-aligned (hackily). Really
+            # what we want is text which is left-aligned from `pos` by center aligned
+            # within its maximum width. tricky...
+            fringe_layout = staff.fringe_layout_at(None)
+            x_offset = fringe_layout.key_signature
+            self.upper_text.x += x_offset
+            self.lower_text.x += x_offset
