@@ -184,8 +184,8 @@ class Staff(PaintedObject, HasMusicFont):
         else:
             return []
 
-    def fringe_layout_at(self, location: NewLine | Unit) -> StaffFringeLayout:
-        if isinstance(location, NewLine):
+    def fringe_layout_at(self, location: Optional[NewLine]) -> StaffFringeLayout:
+        if location:
             cached_result = self._fringe_layouts.get(location)
             if cached_result:
                 return cached_result
@@ -195,7 +195,7 @@ class Staff(PaintedObject, HasMusicFont):
             layout = self._fringe_layout_at_staff_pos_x(line_staff_pos_x)
             self._fringe_layouts[location] = layout
             return layout
-        return self._fringe_layout_at_staff_pos_x(location)
+        return self._fringe_layout_at_staff_pos_x(ZERO)
 
     def render_slice(
         self,
@@ -251,9 +251,9 @@ class Staff(PaintedObject, HasMusicFont):
         time_signature_fringe_pos = ZERO  # TODO
         key_signature_fringe_pos = time_signature_fringe_pos - ZERO  # TODO
         clef_fringe_pos = key_signature_fringe_pos - clef_width
-        staff_fringe_pos = clef_fringe_pos
+        staff_fringe_pos = clef_fringe_pos - self.unit(0.5)
         return StaffFringeLayout(
-            staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
+            pos_x, staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
         )
 
     def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
