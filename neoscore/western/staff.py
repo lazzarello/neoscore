@@ -29,6 +29,10 @@ class Staff(PaintedObject, HasMusicFont):
     # Padding on left side of staff before anything should come after it
     # (in pseudo-staff-units)
     _LEFT_PADDING = 0.5
+    # Padding on either side of time signatures in fringes
+    _TIME_SIG_PADDING = 0.5
+    # PAdding to the left of key signatures in fringes
+    _KEY_SIG_LEFT_PADDING = 0.5
 
     def __init__(
         self,
@@ -134,11 +138,12 @@ class Staff(PaintedObject, HasMusicFont):
             return self.breakable_length - start_x
         return closest_x - start_x
 
+    @property
     def clefs(self) -> list[tuple[Unit, Clef]]:
         """All the clefs in this staff, ordered by their relative x pos."""
-        cached_clef_positions = getattr(self, "_clef_x_positions", None)
-        if cached_clef_positions:
-            return cached_clef_positions
+        cached_positions = getattr(self, "_clef_x_positions", None)
+        if cached_positions:
+            return cached_positions
         result = [
             (clef.pos_x_in_staff, clef)
             for clef in self.descendants_with_attribute("middle_c_staff_position")
@@ -149,17 +154,17 @@ class Staff(PaintedObject, HasMusicFont):
 
     def active_clef_at(self, pos_x: Unit) -> Optional[Clef]:
         """Return the active clef at a given x position, if any."""
-        clefs = self.clefs()
         return next(
-            (clef for (clef_x, clef) in reversed(clefs) if clef_x <= pos_x),
+            (clef for (clef_x, clef) in reversed(self.clefs) if clef_x <= pos_x),
             None,
         )
 
+    @property
     def key_signatures(self) -> list[tuple[Unit, KeySignature]]:
         """All the key signatures in this staff, ordered by their relative x pos."""
-        cached_clef_positions = getattr(self, "_key_signature_x_positions", None)
-        if cached_clef_positions:
-            return cached_clef_positions
+        cached_positions = getattr(self, "_key_signature_x_positions", None)
+        if cached_positions:
+            return cached_positions
         result = [
             (sig.pos_x_in_staff, sig)
             for sig in self.descendants_with_attribute(
@@ -170,12 +175,28 @@ class Staff(PaintedObject, HasMusicFont):
         self._key_signature_x_positions = result
         return result
 
+    # TODO HIGH - DRY these methods - would also make it easier to invalidate these caches after rendering is done
+
+    @property
+    def time_signatures(self) -> list[tuple[Unit, KeySignature]]:
+        """All the time signatures in this staff, ordered by their relative x pos."""
+        cached_positions = getattr(self, "_time_signature_x_positions", None)
+        if cached_positions:
+            return cached_positions
+        result = [
+            (self.descendant_pos_x(sig), sig)
+            for sig in self.descendants_with_attribute(
+                "_neoscore_time_signature_type_marker"
+            )
+        ]
+        result.sort(key=lambda tup: tup[0])
+        self._time_signature_x_positions = result
+        return result
+
     def active_key_signature_at(self, pos_x: Unit) -> Optional[KeySignature]:
         """Return the active key signature at a given x position, if any."""
-
-        sigs = self.key_signatures()
         return next(
-            (sig for (sig_x, sig) in reversed(sigs) if sig_x <= pos_x),
+            (sig for (sig_x, sig) in reversed(self.key_signatures) if sig_x <= pos_x),
             None,
         )
 
@@ -281,15 +302,37 @@ class Staff(PaintedObject, HasMusicFont):
     ######## PRIVATE METHODS ########
 
     def _fringe_layout_at_staff_pos_x(self, pos_x: Unit) -> StaffFringeLayout:
+        # Work right-to-left through different fringe layers
+        current_x = ZERO
         clef = self.active_clef_at(pos_x)
         key_sig = self.active_key_signature_at(pos_x)
-        clef_width = clef.bounding_rect.width if clef else ZERO
-        time_signature_fringe_pos = ZERO  # TODO
-        key_signature_fringe_pos = time_signature_fringe_pos - key_sig.visual_width
-        clef_fringe_pos = key_signature_fringe_pos - clef_width
-        staff_fringe_pos = clef_fringe_pos - self.unit(Staff._LEFT_PADDING)
+        time_sig = next((sig for x, sig in self.time_signatures if x == pos_x), None)
+
+        staff_fringe_pos = None
+        clef_fringe_pos = None
+        key_signature_fringe_pos = None
+        time_signature_fringe_pos = None
+
+        if time_sig:
+            time_sig_padding = self.unit(Staff._TIME_SIG_PADDING)
+            current_x -= time_sig.visual_width + time_sig_padding
+            time_signature_fringe_pos = current_x
+            current_x -= time_sig_padding
+        if key_sig:
+            current_x -= key_sig.visual_width
+            key_signature_fringe_pos = current_x
+            current_x -= self.unit(Staff._KEY_SIG_LEFT_PADDING)
+        if clef:
+            current_x -= clef.bounding_rect.width
+            clef_fringe_pos = current_x
+        current_x -= self.unit(Staff._LEFT_PADDING)
+        staff_fringe_pos = current_x
         return StaffFringeLayout(
-            pos_x, staff_fringe_pos, clef_fringe_pos, key_signature_fringe_pos, ZERO
+            pos_x,
+            staff_fringe_pos,
+            clef_fringe_pos,
+            key_signature_fringe_pos,
+            time_signature_fringe_pos,
         )
 
     def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
@@ -329,13 +372,31 @@ class Staff(PaintedObject, HasMusicFont):
             flowable.add_margin_controller(
                 MarginController(flowable_x, margin_needed, "neoscore_clef")
             )
-        # Assume that in key signatures have the same width in all clefs
-        for keysig in self.descendants_with_attribute(
-            "_neoscore_key_signature_type_marker"
-        ):
-            flowable_x = staff_flowable_x + keysig.x
+        # Assume that key signatures have the same width in all clefs
+        for key_sig_x, key_sig in self.key_signatures:
+            flowable_x = staff_flowable_x + key_sig_x
             flowable.add_margin_controller(
-                MarginController(flowable_x, keysig.visual_width, "neoscore_keysig")
+                MarginController(
+                    flowable_x,
+                    key_sig.visual_width + self.unit(Staff._KEY_SIG_LEFT_PADDING),
+                    "neoscore_key_signature",
+                )
+            )
+        for time_sig in self.descendants_with_attribute(
+            "_neoscore_time_signature_type_marker"
+        ):
+            flowable_x = flowable.descendant_pos_x(time_sig)
+            flowable.add_margin_controller(
+                MarginController(
+                    flowable_x,
+                    time_sig.visual_width + (self.unit(Staff._TIME_SIG_PADDING) * 2),
+                    "neoscore_time_signature",
+                )
+            )
+            # Cancel the margin controller immediately after it afters, this way time
+            # signatures only affect margins if they lie right around a line start.
+            flowable.add_margin_controller(
+                MarginController(flowable_x + Unit(1), ZERO, "neoscore_time_signature")
             )
 
     def pre_render_hook(self):

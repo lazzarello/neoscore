@@ -17,6 +17,8 @@ staves = [upper_staff, lower_staff]
 Brace(Mm(0), staves)
 SystemLine(Mm(0), staves)
 
+Path.straight_line(ORIGIN, flowable, (ZERO, Mm(40)))
+
 # We can use the same unit in the upper and lower staves since they
 # are the same size
 unit = upper_staff.unit

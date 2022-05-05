@@ -19,6 +19,10 @@ class TimeSignature(PositionedObject, HasMusicFont):
     automatic engraving since ``neoscore.western`` has no internal concept of measures.
     """
 
+    # Type sentinel used to hackily check type
+    # without importing the type, risking cyclic imports.
+    _neoscore_time_signature_type_marker = True
+
     def __init__(
         self,
         pos_x: Unit,
@@ -70,12 +74,12 @@ class TimeSignature(PositionedObject, HasMusicFont):
         return self._lower_text
 
     @property
-    def width(self) -> Unit:
+    def visual_width(self) -> Unit:
         """The visual width of the time signature.
 
         This is useful for laying out staff objects near time signatures.
         """
-        return self._width
+        return self._visual_width
 
     @property
     def meter(self) -> Meter:
@@ -107,25 +111,21 @@ class TimeSignature(PositionedObject, HasMusicFont):
         upper_width = self.upper_text.bounding_rect.width
         lower_width = self.lower_text.bounding_rect.width
         if upper_width > lower_width:
-            self._width = upper_width
+            self._visual_width = upper_width
             self.upper_text.x = ZERO
             self.lower_text.x += (upper_width - lower_width) / 2
         elif lower_width > upper_width:
-            self._width = lower_width
+            self._visual_width = lower_width
             self.lower_text.x = ZERO
             self.upper_text.x += (lower_width - upper_width) / 2
         else:
             # Widths are equal. No adjustment needed.
-            self._width = upper_width
+            self._visual_width = upper_width
         # Finally, if this time signature is placed at x=0 relative to a staff, adjust X
         # to fit the staff's fringe layout. This is rather hacky...
         staff = self.first_ancestor_with_attr("_neoscore_staff_type_marker")
         if staff and staff.descendant_pos_x(self) == ZERO:
-            # TODO NEXT this doesn't quite work because it assumes text is left-aligned
-            # from the original pos when it's actually center-aligned (hackily). Really
-            # what we want is text which is left-aligned from `pos` by center aligned
-            # within its maximum width. tricky...
             fringe_layout = staff.fringe_layout_at(None)
-            x_offset = fringe_layout.key_signature
+            x_offset = fringe_layout.time_signature
             self.upper_text.x += x_offset
             self.lower_text.x += x_offset

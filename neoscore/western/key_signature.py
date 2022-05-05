@@ -64,7 +64,7 @@ class KeySignature(PositionedObject, StaffObject):
         """The visual width of this key signature
 
         This assumes that key signatures have the same width in any clef, and that the
-        accidentals used in key signatures are 0.5 staff units wide.
+        accidentals used in key signatures are 1 staff unit wide.
         """
         max_x = 0
         for letter, accidental_type in self.key_signature_type.value.items():
@@ -75,9 +75,7 @@ class KeySignature(PositionedObject, StaffObject):
             else:
                 pos_tuple = clef_type.TREBLE.key_signature_flat_layout[letter]
             max_x = max(max_x, pos_tuple[0])
-        # Hackily assume final accidental width is 0.5 units (which is true for flats
-        # and sharps)
-        return self.staff.unit(max_x + 0.5)
+        return self.staff.unit(max_x + 1)
 
     def render_occurrence(
         self, pos: Point, flowable_line: Optional[NewLine], for_line_start: bool

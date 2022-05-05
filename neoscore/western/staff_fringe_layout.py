@@ -9,4 +9,4 @@ class StaffFringeLayout:
     staff: Unit
     clef: Unit
     key_signature: Unit
-    TimeSignature: Unit = ZERO
+    time_signature: Unit = ZERO
