@@ -149,6 +149,7 @@ class Staff(PaintedObject, HasMusicFont):
             for clef in self.descendants_with_attribute("middle_c_staff_position")
         ]
         result.sort(key=lambda tup: tup[0])
+        # TODO HIGH i don't think it's actually safe to cache this value until render time...
         self._clef_x_positions = result
         return result
 
@@ -248,6 +249,10 @@ class Staff(PaintedObject, HasMusicFont):
             line_staff_pos_x = location.flowable_x - self.flowable.descendant_pos_x(
                 self
             )
+            if line_staff_pos_x < ZERO:
+                # This happens on the first line of a staff positioned at x>0 relative
+                # to its flowable.
+                line_staff_pos_x = ZERO
             layout = self._fringe_layout_at_staff_pos_x(line_staff_pos_x)
             self._fringe_layouts[location] = layout
             return layout
@@ -260,7 +265,7 @@ class Staff(PaintedObject, HasMusicFont):
         clip_width: Optional[Unit],
         flowable_line: Optional[NewLine],
     ):
-        fringe_layout = self.fringe_layout_at(flowable_line or ZERO)
+        fringe_layout = self.fringe_layout_at(flowable_line)
         if clip_width is None:
             if clip_start_x is None:
                 slice_length = self.breakable_length
@@ -308,7 +313,6 @@ class Staff(PaintedObject, HasMusicFont):
         key_sig = self.active_key_signature_at(pos_x)
         time_sig = next((sig for x, sig in self.time_signatures if x == pos_x), None)
 
-        staff_fringe_pos = None
         clef_fringe_pos = None
         key_signature_fringe_pos = None
         time_signature_fringe_pos = None
@@ -325,6 +329,8 @@ class Staff(PaintedObject, HasMusicFont):
         if clef:
             current_x -= clef.bounding_rect.width
             clef_fringe_pos = current_x
+        else:
+            pass
         current_x -= self.unit(Staff._LEFT_PADDING)
         staff_fringe_pos = current_x
         return StaffFringeLayout(
@@ -366,7 +372,7 @@ class Staff(PaintedObject, HasMusicFont):
                 staff_flowable_x, self.unit(Staff._LEFT_PADDING), "neoscore_staff"
             )
         )
-        for clef_x, clef in self._clef_x_positions:
+        for clef_x, clef in self.clefs:
             flowable_x = staff_flowable_x + clef_x
             margin_needed = clef.bounding_rect.width
             flowable.add_margin_controller(

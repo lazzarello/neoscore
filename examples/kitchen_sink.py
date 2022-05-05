@@ -37,19 +37,9 @@ later_lowest_staff_clef = Clef(Mm(100), lowest_staff, "treble")
 
 # Once flowable gutters are implemented, this explicit offsets for
 # key/time sigs will not be needed
-upper_staff_key_signature = KeySignature(
-    upper_staff_clef.bounding_rect.width + staff.unit(0.5), staff, "af_major"
-)
-lower_staff_key_signature = KeySignature(
-    lower_staff_clef.bounding_rect.width + lower_staff.unit(0.5),
-    lower_staff,
-    "cs_major",
-)
-lowest_staff_key_signature = KeySignature(
-    lowest_staff_clef.bounding_rect.width + lowest_staff.unit(0.5),
-    lowest_staff,
-    "d_minor",
-)
+upper_staff_key_signature = KeySignature(ZERO, staff, "af_major")
+lower_staff_key_signature = KeySignature(ZERO, lower_staff, "cs_major")
+lowest_staff_key_signature = KeySignature(ZERO, lowest_staff, "d_minor")
 
 octave_line = OctaveLine((Mm(20), staff.unit(-3)), staff, Mm(1000), indication="8vb")
 
