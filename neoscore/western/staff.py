@@ -10,7 +10,7 @@ from neoscore.core.painted_object import PaintedObject
 from neoscore.core.path import Path
 from neoscore.core.pen import Pen, PenDef
 from neoscore.core.point import Point, PointDef
-from neoscore.core.positioned_object import PositionedObject
+from neoscore.core.positioned_object import PositionedObject, render_cached_property
 from neoscore.core.units import ZERO, Mm, Unit, make_unit_class
 from neoscore.western.staff_fringe_layout import StaffFringeLayout
 
@@ -138,19 +138,14 @@ class Staff(PaintedObject, HasMusicFont):
             return self.breakable_length - start_x
         return closest_x - start_x
 
-    @property
+    @render_cached_property
     def clefs(self) -> list[tuple[Unit, Clef]]:
         """All the clefs in this staff, ordered by their relative x pos."""
-        cached_positions = getattr(self, "_clef_x_positions", None)
-        if cached_positions:
-            return cached_positions
         result = [
             (clef.pos_x_in_staff, clef)
             for clef in self.descendants_with_attribute("middle_c_staff_position")
         ]
         result.sort(key=lambda tup: tup[0])
-        # TODO HIGH i don't think it's actually safe to cache this value until render time...
-        self._clef_x_positions = result
         return result
 
     def active_clef_at(self, pos_x: Unit) -> Optional[Clef]:
@@ -160,12 +155,9 @@ class Staff(PaintedObject, HasMusicFont):
             None,
         )
 
-    @property
+    @render_cached_property
     def key_signatures(self) -> list[tuple[Unit, KeySignature]]:
         """All the key signatures in this staff, ordered by their relative x pos."""
-        cached_positions = getattr(self, "_key_signature_x_positions", None)
-        if cached_positions:
-            return cached_positions
         result = [
             (sig.pos_x_in_staff, sig)
             for sig in self.descendants_with_attribute(
@@ -173,17 +165,13 @@ class Staff(PaintedObject, HasMusicFont):
             )
         ]
         result.sort(key=lambda tup: tup[0])
-        self._key_signature_x_positions = result
         return result
 
     # TODO HIGH - DRY these methods - would also make it easier to invalidate these caches after rendering is done
 
-    @property
+    @render_cached_property
     def time_signatures(self) -> list[tuple[Unit, KeySignature]]:
         """All the time signatures in this staff, ordered by their relative x pos."""
-        cached_positions = getattr(self, "_time_signature_x_positions", None)
-        if cached_positions:
-            return cached_positions
         result = [
             (self.descendant_pos_x(sig), sig)
             for sig in self.descendants_with_attribute(
@@ -191,7 +179,6 @@ class Staff(PaintedObject, HasMusicFont):
             )
         ]
         result.sort(key=lambda tup: tup[0])
-        self._time_signature_x_positions = result
         return result
 
     def active_key_signature_at(self, pos_x: Unit) -> Optional[KeySignature]:
@@ -407,4 +394,5 @@ class Staff(PaintedObject, HasMusicFont):
 
     def pre_render_hook(self):
         # TODO do these need to be cleaned up after rendering?
+        super().pre_render_hook
         self._register_layout_controllers()

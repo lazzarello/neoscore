@@ -14,6 +14,30 @@ if TYPE_CHECKING:
     from neoscore.core.layout_controllers import NewLine
 
 
+class render_cached_property:
+
+    """A ``PositionedObject`` property which is cached only at render time.
+
+    You can annotate any ``PositionedObject`` property to get this behavior, including
+    on inheriting classes.
+    """
+
+    def __init__(self, func):
+        self.__doc__ = getattr(func, "__doc__")
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        result = self.func(obj)
+        if not getattr(obj, "__currently_rendering", None):
+            return result
+        property_name = self.func.__name__
+        value = obj.__dict__[property_name] = result
+        obj._render_cached_properties.add(property_name)
+        return value
+
+
 class PositionedObject:
     """An object positioned in the scene
 
@@ -50,6 +74,7 @@ class PositionedObject:
         self._children: list[PositionedObject] = []
         self._parent = PositionedObject._resolve_parent(parent)
         self._set_parent_and_register_self(parent)
+        self._render_cached_properties: set[str] = set()
         self._interfaces = []
 
     @property
@@ -298,19 +323,18 @@ class PositionedObject:
     def pre_render_hook(self):
         """Run code once just before document rendering begins.
 
-        This is an experimental feature to support precomputation and
-        caching for expensive methods.
-
-        Any data cached in this function must be cleared in a
-        corresponding ``post_render_hook``.
+        Implementations *must* call the super class function as well.
         """
+        self.__currently_rendering = True
 
     def post_render_hook(self):
         """Run code once after document rendering completes.
 
-        Any cached data stored in ``pre_render_hook`` must be cleared
-        in this function.
+        Implementations *must* call the super class function as well.
         """
+        for cached_property in self._render_cached_properties:
+            del self.__dict__[cached_property]
+        self.__currently_rendering = False
 
     def render(self):
         """Render the object and all its children."""
