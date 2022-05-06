@@ -9,6 +9,7 @@ from neoscore.core.units import ZERO, Mm
 from neoscore.western import clef_type
 from neoscore.western.clef import Clef
 from neoscore.western.staff import NoClefError, Staff
+from neoscore.western.staff_group import StaffGroup
 from tests.helpers import assert_almost_equal
 
 from ..helpers import AppTest
@@ -21,6 +22,13 @@ class TestStaff(AppTest):
             *[Mm(val) for val in [210, 297, 20, 20, 20, 20, 10]]
         )
         self.flowable = Flowable((Mm(0), Mm(0)), None, Mm(10000), Mm(30), Mm(5))
+
+    def test_staff_group(self):
+        staff = Staff(ORIGIN, None, Mm(100))
+        assert staff.group is not None
+        group = StaffGroup()
+        staff = Staff(ORIGIN, None, Mm(100), group)
+        assert staff.group == group
 
     def test_height(self):
         # 5 lines

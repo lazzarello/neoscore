@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from neoscore.core.has_music_font import HasMusicFont
 from neoscore.core.layout_controllers import NewLine
 from neoscore.core.music_font import MusicFont
 from neoscore.core.music_text import MusicText
 from neoscore.core.point import ORIGIN, Point
 from neoscore.core.positioned_object import PositionedObject
+from neoscore.core.text_alignment import AlignmentX
 from neoscore.core.units import ZERO, Unit
 from neoscore.western.meter import Meter, MeterDef
 from neoscore.western.staff import Staff
-from neoscore.core.text_alignment import AlignmentX
 from neoscore.western.staff_object import StaffObject
 
 

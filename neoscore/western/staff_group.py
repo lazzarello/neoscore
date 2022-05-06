@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional
 
 from neoscore.core.layout_controllers import NewLine
@@ -84,14 +85,6 @@ class StaffGroup:
         time_sig = next(
             (sig for x, sig in staff.time_signatures if x == staff_pos_x), None
         )
-
-        if (
-            (not time_sig)
-            and (clef.clef_type.glyph_name == "fClef")
-            and staff_pos_x == ZERO
-        ):
-            print(staff.time_signatures)
-
         clef_fringe_pos = current_x
         key_signature_fringe_pos = current_x
         time_signature_fringe_pos = current_x
