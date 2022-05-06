@@ -173,26 +173,22 @@ class TestStaff(AppTest):
             staff.unit(-1),
         ]
 
-    def test_elements_when_not_located_at_origin(self):
-        """Regression test
-
-        Ensure lines are drawn at the correct locations when staff is not
-        positioned at (0, 0)
-        """
+    def test_path_drawing(self):
         staff = Staff(
             (Mm(2), Mm(3)), self.flowable, Mm(10), line_spacing=Mm(1), line_count=5
         )
+        path = staff._create_staff_segment_path(Point(Mm(2), Mm(3)), Mm(10))
         self.flowable.render()
         # Top line
-        assert staff.elements[0].pos == Point(Mm(0), Mm(0))
-        assert staff.elements[0].parent == staff
-        assert staff.elements[1].pos == Point(Mm(10), Mm(0))
-        assert staff.elements[1].parent == staff
+        assert path.elements[0].pos == Point(Mm(0), Mm(0))
+        assert path.elements[0].parent == path
+        assert path.elements[1].pos == Point(Mm(10), Mm(0))
+        assert path.elements[1].parent == path
         # Second line
-        assert staff.elements[2].pos == Point(Mm(0), Mm(1))
-        assert staff.elements[2].parent == staff
-        assert staff.elements[3].pos == Point(Mm(10), Mm(1))
-        assert staff.elements[3].parent == staff
+        assert path.elements[2].pos == Point(Mm(0), Mm(1))
+        assert path.elements[2].parent == path
+        assert path.elements[3].pos == Point(Mm(10), Mm(1))
+        assert path.elements[3].parent == path
 
     def test_staff_outside_flowable(self):
         staff = Staff((Mm(2), Mm(3)), None, Mm(10), line_spacing=Mm(1), line_count=5)

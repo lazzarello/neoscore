@@ -38,6 +38,7 @@ class Clef(MusicText, StaffObject):
             staff: The parent staff
             clef_type: The type of clef. String names of common clefs may be
                 given as a convenience; see ``ClefTypeDef``.
+            font: The font used. Defaults to the staff's font.
         """
         StaffObject.__init__(self, staff)
         # Init with placeholder y position and text; clef_type setter will update

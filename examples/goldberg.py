@@ -11,8 +11,9 @@ flowable = Flowable((Mm(0), Mm(0)), None, Mm(500), Mm(30), Mm(10), Mm(20))
 flowable.provided_controllers.add(MarginController(ZERO, Mm(20)))
 flowable.provided_controllers.add(MarginController(Mm(1), ZERO))
 
-upper_staff = Staff((Mm(0), Mm(0)), flowable, Mm(500))
-lower_staff = Staff((Mm(0), Mm(20)), flowable, Mm(500))
+staff_group = StaffGroup()
+upper_staff = Staff((Mm(0), Mm(0)), flowable, Mm(500), staff_group)
+lower_staff = Staff((Mm(0), Mm(20)), flowable, Mm(500), staff_group)
 staves = [upper_staff, lower_staff]
 Brace(Mm(0), staves)
 SystemLine(Mm(0), staves)

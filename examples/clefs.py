@@ -4,10 +4,11 @@ from neoscore.western.clef_type import CLEF_TYPE_SHORTHAND_NAMES
 neoscore.setup()
 from helpers import render_example
 
+staff_group = StaffGroup()
 staves = []
 
 for (i, clef_type) in enumerate(CLEF_TYPE_SHORTHAND_NAMES.values()):
-    staff = Staff((Mm(20), Mm(i * 30)), None, Mm(100))
+    staff = Staff((Mm(20), Mm(i * 30)), None, Mm(100), staff_group)
     staves.append(staff)
     unit = staff.unit
     clef = Clef(ZERO, staff, clef_type)

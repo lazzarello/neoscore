@@ -75,6 +75,7 @@ class KeySignature(PositionedObject, StaffObject):
             else:
                 pos_tuple = clef_type.TREBLE.key_signature_flat_layout[letter]
             max_x = max(max_x, pos_tuple[0])
+        # Add max position + 1 for accidental width
         return self.staff.unit(max_x + 1)
 
     def render_occurrence(

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from neoscore.core.units import ZERO, Unit
 
 
-@dataclass
+@dataclass(frozen=True)
 class StaffFringeLayout:
     pos_x_in_staff: Unit
     staff: Unit

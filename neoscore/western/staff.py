@@ -13,6 +13,7 @@ from neoscore.core.point import Point, PointDef
 from neoscore.core.positioned_object import PositionedObject, render_cached_property
 from neoscore.core.units import ZERO, Mm, Unit, make_unit_class
 from neoscore.western.staff_fringe_layout import StaffFringeLayout
+from neoscore.western.staff_group import StaffGroup
 
 if TYPE_CHECKING:
     from neoscore.western.clef import Clef
@@ -26,19 +27,12 @@ class Staff(PaintedObject, HasMusicFont):
     # without importing the type, risking cyclic imports.
     _neoscore_staff_type_marker = True
 
-    # Padding on left side of staff before anything should come after it
-    # (in pseudo-staff-units)
-    _LEFT_PADDING = 0.5
-    # Padding on either side of time signatures in fringes
-    _TIME_SIG_PADDING = 0.5
-    # PAdding to the left of key signatures in fringes
-    _KEY_SIG_LEFT_PADDING = 0.5
-
     def __init__(
         self,
         pos: PointDef,
         parent: Optional[PositionedObject],
         length: Unit,
+        group: Optional[StaffGroup] = None,
         line_spacing: Unit = Mm(1.75),
         line_count: int = 5,
         music_font_family: str = "Bravura",
@@ -50,6 +44,8 @@ class Staff(PaintedObject, HasMusicFont):
             parent: The parent for the staff. Make this a ``Flowable``
                 to allow the staff to run across line and page breaks.
             length: The horizontal width of the staff
+            group: The staff group this belongs to. Set this if being used in a system
+                of multiple staves.
             line_spacing: The distance between two lines in the staff.
             line_count: The number of lines in the staff.
             music_font_family: The name of the font to use for MusicText objects
@@ -66,6 +62,8 @@ class Staff(PaintedObject, HasMusicFont):
         PaintedObject.__init__(self, pos, parent, pen=pen)
         self._line_count = line_count
         self._length = length
+        self._group = group or StaffGroup()
+        self._group.staves.append(self)
         self._fringe_layouts = {}
 
     ######## PUBLIC PROPERTIES ########
@@ -110,6 +108,15 @@ class Staff(PaintedObject, HasMusicFont):
         # Override expensive ``Path.length`` since the staff length here
         # is already known.
         return self._length
+
+    @property
+    def group(self) -> StaffGroup:
+        """The staff group this belongs to.
+
+        A staff group should be assigned during initalization for proper display of
+        staff systems.
+        """
+        return self._group
 
     ######## PUBLIC METHODS ########
 
@@ -229,21 +236,7 @@ class Staff(PaintedObject, HasMusicFont):
             return []
 
     def fringe_layout_at(self, location: Optional[NewLine]) -> StaffFringeLayout:
-        if location:
-            cached_result = self._fringe_layouts.get(location)
-            if cached_result:
-                return cached_result
-            line_staff_pos_x = location.flowable_x - self.flowable.descendant_pos_x(
-                self
-            )
-            if line_staff_pos_x < ZERO:
-                # This happens on the first line of a staff positioned at x>0 relative
-                # to its flowable.
-                line_staff_pos_x = ZERO
-            layout = self._fringe_layout_at_staff_pos_x(line_staff_pos_x)
-            self._fringe_layouts[location] = layout
-            return layout
-        return self._fringe_layout_at_staff_pos_x(ZERO)
+        return self.group.fringe_layout_at(self, location)
 
     def render_slice(
         self,
@@ -293,41 +286,6 @@ class Staff(PaintedObject, HasMusicFont):
 
     ######## PRIVATE METHODS ########
 
-    def _fringe_layout_at_staff_pos_x(self, pos_x: Unit) -> StaffFringeLayout:
-        # Work right-to-left through different fringe layers
-        current_x = ZERO
-        clef = self.active_clef_at(pos_x)
-        key_sig = self.active_key_signature_at(pos_x)
-        time_sig = next((sig for x, sig in self.time_signatures if x == pos_x), None)
-
-        clef_fringe_pos = None
-        key_signature_fringe_pos = None
-        time_signature_fringe_pos = None
-
-        if time_sig:
-            time_sig_padding = self.unit(Staff._TIME_SIG_PADDING)
-            current_x -= time_sig.visual_width + time_sig_padding
-            time_signature_fringe_pos = current_x
-            current_x -= time_sig_padding
-        if key_sig:
-            current_x -= key_sig.visual_width
-            key_signature_fringe_pos = current_x
-            current_x -= self.unit(Staff._KEY_SIG_LEFT_PADDING)
-        if clef:
-            current_x -= clef.bounding_rect.width
-            clef_fringe_pos = current_x
-        else:
-            pass
-        current_x -= self.unit(Staff._LEFT_PADDING)
-        staff_fringe_pos = current_x
-        return StaffFringeLayout(
-            pos_x,
-            staff_fringe_pos,
-            clef_fringe_pos,
-            key_signature_fringe_pos,
-            time_signature_fringe_pos,
-        )
-
     def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
         path = Path(doc_pos, None, pen=self.pen)
         for i in range(self.line_count):
@@ -350,13 +308,14 @@ class Staff(PaintedObject, HasMusicFont):
         return make_unit_class("StaffUnit", staff_unit_size.base_value)
 
     def _register_layout_controllers(self):
+        # Maybe move this functionality into StaffGroup?
         flowable = self.flowable
         if not flowable:
             return
         staff_flowable_x = flowable.descendant_pos_x(self)
         flowable.add_margin_controller(
             MarginController(
-                staff_flowable_x, self.unit(Staff._LEFT_PADDING), "neoscore_staff"
+                staff_flowable_x, self.unit(StaffGroup.LEFT_PADDING), "neoscore_staff"
             )
         )
         for clef_x, clef in self.clefs:
@@ -371,7 +330,7 @@ class Staff(PaintedObject, HasMusicFont):
             flowable.add_margin_controller(
                 MarginController(
                     flowable_x,
-                    key_sig.visual_width + self.unit(Staff._KEY_SIG_LEFT_PADDING),
+                    key_sig.visual_width + self.unit(StaffGroup.KEY_SIG_LEFT_PADDING),
                     "neoscore_key_signature",
                 )
             )
@@ -382,7 +341,8 @@ class Staff(PaintedObject, HasMusicFont):
             flowable.add_margin_controller(
                 MarginController(
                     flowable_x,
-                    time_sig.visual_width + (self.unit(Staff._TIME_SIG_PADDING) * 2),
+                    time_sig.visual_width
+                    + (self.unit(StaffGroup.TIME_SIG_LEFT_PADDING) * 2),
                     "neoscore_time_signature",
                 )
             )
