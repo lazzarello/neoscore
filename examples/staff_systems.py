@@ -21,8 +21,7 @@ Clef(ZERO, staff_2, "bass")
 KeySignature(ZERO, staff_2, "cf_major")
 TimeSignature(ZERO, staff_2, ([3, 3, 2], 8))
 
-# StaffGroup not supported yet for tab staves
-staff_3 = TabStaff((ZERO, Mm(30)), flowable, length)
+staff_3 = TabStaff((ZERO, Mm(30)), flowable, length, group)
 TabClef(ZERO, staff_3)
 TabNumber(ZERO, staff_3, 3, 123)
 

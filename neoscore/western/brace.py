@@ -8,7 +8,8 @@ from neoscore.core.pen import PenDef
 from neoscore.core.point import Point
 from neoscore.core.text_alignment import AlignmentX
 from neoscore.core.units import Unit
-from neoscore.western.multi_staff_object import MultiStaffObject, StaffLike
+from neoscore.western.abstract_staff import AbstractStaff
+from neoscore.western.multi_staff_object import MultiStaffObject
 
 
 class Brace(MultiStaffObject, MusicText):
@@ -22,7 +23,7 @@ class Brace(MultiStaffObject, MusicText):
     def __init__(
         self,
         pos_x: Unit,
-        staves: list[StaffLike],
+        staves: list[AbstractStaff],
         font: Optional[MusicFont] = None,
         brush: Optional[BrushDef] = None,
         pen: Optional[PenDef] = None,

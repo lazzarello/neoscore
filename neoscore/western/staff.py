@@ -3,15 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Type, cast
 
 from neoscore.core.exceptions import NoClefError
-from neoscore.core.has_music_font import HasMusicFont
 from neoscore.core.layout_controllers import MarginController, NewLine
 from neoscore.core.music_font import MusicFont
-from neoscore.core.painted_object import PaintedObject
-from neoscore.core.path import Path
 from neoscore.core.pen import Pen, PenDef
-from neoscore.core.point import Point, PointDef
+from neoscore.core.point import PointDef
 from neoscore.core.positioned_object import PositionedObject, render_cached_property
 from neoscore.core.units import ZERO, Mm, Unit, make_unit_class
+from neoscore.western.abstract_staff import AbstractStaff
 from neoscore.western.staff_fringe_layout import StaffFringeLayout
 from neoscore.western.staff_group import StaffGroup
 
@@ -20,12 +18,8 @@ if TYPE_CHECKING:
     from neoscore.western.key_signature import KeySignature
 
 
-class Staff(PaintedObject, HasMusicFont):
+class Staff(AbstractStaff):
     """A staff with decently high-level knowledge of its contents."""
-
-    # Type sentinel used to hackily check if objects are Staff
-    # without importing the type, risking cyclic imports.
-    _neoscore_staff_type_marker = True
 
     def __init__(
         self,
@@ -55,68 +49,11 @@ class Staff(PaintedObject, HasMusicFont):
                 thickness from the music font's engraving default.
         """
         unit = self._make_unit_class(line_spacing)
-        self._music_font = MusicFont(music_font_family, unit)
-        pen = pen or Pen(
-            thickness=self._music_font.engraving_defaults["staffLineThickness"]
+        music_font = MusicFont(music_font_family, unit)
+        pen = pen or Pen(thickness=music_font.engraving_defaults["staffLineThickness"])
+        super().__init__(
+            pos, parent, length, group, unit(1), line_count, music_font, pen
         )
-        PaintedObject.__init__(self, pos, parent, pen=pen)
-        self._line_count = line_count
-        self._length = length
-        self._group = group or StaffGroup()
-        self._group.staves.append(self)
-        self._fringe_layouts = {}
-
-    ######## PUBLIC PROPERTIES ########
-
-    @property
-    def music_font(self) -> MusicFont:
-        return self._music_font
-
-    @property
-    def height(self) -> Unit:
-        """The height of the staff from top to bottom line.
-
-        If the staff only has one line, its height is defined as 0.
-        """
-        return self.unit(self.line_count - 1)
-
-    @property
-    def line_count(self) -> int:
-        """The number of lines in the staff"""
-        return self._line_count
-
-    @property
-    def center_y(self) -> Unit:
-        """The position of the center staff position"""
-        return self.height / 2
-
-    @property
-    def barline_extent(self) -> tuple[Unit, Unit]:
-        """The starting and stopping Y positions of barlines in this staff.
-
-        For staves with more than 1 line, this extends from the top line to bottom
-        line. For single-line staves, this extends from 1 unit above and below the
-        staff.
-        """
-        if self.line_count == 1:
-            return self.unit(-1), self.unit(1)
-        else:
-            return ZERO, self.height
-
-    @property
-    def breakable_length(self) -> Unit:
-        # Override expensive ``Path.length`` since the staff length here
-        # is already known.
-        return self._length
-
-    @property
-    def group(self) -> StaffGroup:
-        """The staff group this belongs to.
-
-        A staff group should be assigned during initalization for proper display of
-        staff systems.
-        """
-        return self._group
 
     ######## PUBLIC METHODS ########
 
@@ -208,13 +145,6 @@ class Staff(PaintedObject, HasMusicFont):
             raise NoClefError
         return clef.middle_c_staff_position
 
-    def y_inside_staff(self, pos_y: Unit) -> bool:
-        """Determine if a y-axis position is inside the staff.
-
-        This is true for any position within or on the outer lines.
-        """
-        return ZERO <= pos_y <= self.height
-
     def y_on_ledger(self, pos_y: Unit) -> bool:
         """Determine if a y-axis position is approximately at a ledger line position
 
@@ -235,65 +165,6 @@ class Staff(PaintedObject, HasMusicFont):
         else:
             return []
 
-    def fringe_layout_at(self, location: Optional[NewLine]) -> StaffFringeLayout:
-        return self.group.fringe_layout_at(self, location)
-
-    def render_slice(
-        self,
-        pos: Point,
-        clip_start_x: Optional[Unit],
-        clip_width: Optional[Unit],
-        flowable_line: Optional[NewLine],
-    ):
-        fringe_layout = self.fringe_layout_at(flowable_line)
-        if clip_width is None:
-            if clip_start_x is None:
-                slice_length = self.breakable_length
-            else:
-                slice_length = self.breakable_length - clip_start_x
-        else:
-            slice_length = clip_width
-        path = self._create_staff_segment_path(
-            Point(pos.x + fringe_layout.staff, pos.y),
-            slice_length - fringe_layout.staff,
-        )
-        path.render()
-        path.remove()
-
-    def render_complete(
-        self,
-        pos: Point,
-        flowable_line: Optional[NewLine] = None,
-        flowable_x: Optional[Unit] = None,
-    ):
-        self.render_slice(pos, None, None, flowable_line)
-
-    def render_before_break(self, pos: Point, flowable_line: NewLine, flowable_x: Unit):
-        self.render_slice(
-            pos,
-            ZERO,
-            flowable_line.flowable_x + flowable_line.length - flowable_x,
-            flowable_line,
-        )
-
-    def render_spanning_continuation(
-        self, pos: Point, flowable_line: NewLine, object_x: Unit
-    ):
-        self.render_slice(pos, object_x, flowable_line.length, flowable_line)
-
-    def render_after_break(self, pos: Point, flowable_line: NewLine, object_x: Unit):
-        self.render_slice(pos, object_x, None, flowable_line)
-
-    ######## PRIVATE METHODS ########
-
-    def _create_staff_segment_path(self, doc_pos: Point, length: Unit) -> Path:
-        path = Path(doc_pos, None, pen=self.pen)
-        for i in range(self.line_count):
-            y_offset = self.unit(i)
-            path.move_to(ZERO, y_offset)
-            path.line_to(length, y_offset)
-        return path
-
     @staticmethod
     def _make_unit_class(staff_unit_size: Unit) -> Type[Unit]:
         """Create a Unit class with a ratio of 1 to a staff unit size
@@ -308,19 +179,20 @@ class Staff(PaintedObject, HasMusicFont):
         return make_unit_class("StaffUnit", staff_unit_size.base_value)
 
     def _register_layout_controllers(self):
-        # Maybe move this functionality into StaffGroup?
         flowable = self.flowable
         if not flowable:
             return
         staff_flowable_x = flowable.descendant_pos_x(self)
         flowable.add_margin_controller(
             MarginController(
-                staff_flowable_x, self.unit(StaffGroup.LEFT_PADDING), "neoscore_staff"
+                staff_flowable_x, self.unit(StaffGroup.RIGHT_PADDING), "neoscore_staff"
             )
         )
         for clef_x, clef in self.clefs:
             flowable_x = staff_flowable_x + clef_x
-            margin_needed = clef.bounding_rect.width
+            margin_needed = clef.bounding_rect.width + self.unit(
+                StaffGroup.CLEF_LEFT_PADDING
+            )
             flowable.add_margin_controller(
                 MarginController(flowable_x, margin_needed, "neoscore_clef")
             )
@@ -341,8 +213,7 @@ class Staff(PaintedObject, HasMusicFont):
             flowable.add_margin_controller(
                 MarginController(
                     flowable_x,
-                    time_sig.visual_width
-                    + (self.unit(StaffGroup.TIME_SIG_LEFT_PADDING) * 2),
+                    time_sig.visual_width + self.unit(StaffGroup.TIME_SIG_LEFT_PADDING),
                     "neoscore_time_signature",
                 )
             )
@@ -352,7 +223,45 @@ class Staff(PaintedObject, HasMusicFont):
                 MarginController(flowable_x + Unit(1), ZERO, "neoscore_time_signature")
             )
 
-    def pre_render_hook(self):
-        # TODO do these need to be cleaned up after rendering?
-        super().pre_render_hook
-        self._register_layout_controllers()
+    def _fringe_layout_for_isolated_staff(
+        self, location: Optional[NewLine]
+    ) -> StaffFringeLayout:
+        if location:
+            staff_pos_x = location.flowable_x - self.flowable.descendant_pos_x(self)
+            if staff_pos_x < ZERO:
+                # This happens on the first line of a staff positioned at x>0 relative
+                # to its flowable.
+                staff_pos_x = ZERO
+        else:
+            staff_pos_x = ZERO
+        # Work right-to-left through different fringe layers
+        current_x = -self.unit(StaffGroup.RIGHT_PADDING)
+        clef = self.active_clef_at(staff_pos_x)
+        key_sig = self.active_key_signature_at(staff_pos_x)
+        time_sig = next(
+            (sig for x, sig in self.time_signatures if x == staff_pos_x), None
+        )
+        clef_fringe_pos = current_x
+        key_signature_fringe_pos = current_x
+        time_signature_fringe_pos = current_x
+
+        if time_sig:
+            current_x -= time_sig.visual_width
+            time_signature_fringe_pos = current_x
+            current_x -= self.unit(StaffGroup.TIME_SIG_LEFT_PADDING)
+        if key_sig:
+            current_x -= key_sig.visual_width
+            key_signature_fringe_pos = current_x
+            current_x -= self.unit(StaffGroup.KEY_SIG_LEFT_PADDING)
+        if clef:
+            current_x -= clef.bounding_rect.width
+            clef_fringe_pos = current_x
+            current_x -= self.unit(StaffGroup.CLEF_LEFT_PADDING)
+        staff_fringe_pos = current_x
+        return StaffFringeLayout(
+            staff_pos_x,
+            staff_fringe_pos,
+            clef_fringe_pos,
+            key_signature_fringe_pos,
+            time_signature_fringe_pos,
+        )

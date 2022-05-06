@@ -103,8 +103,6 @@ class Clef(MusicText, StaffObject):
         """
         return self._middle_c_staff_position
 
-    ######## PRIVATE METHODS ########
-
     def render_complete(
         self,
         pos: Point,

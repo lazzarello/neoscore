@@ -6,7 +6,8 @@ from neoscore.core.music_path import MusicPath
 from neoscore.core.pen import Pen, PenDef
 from neoscore.core.point import Point
 from neoscore.core.units import ZERO, Unit
-from neoscore.western.multi_staff_object import MultiStaffObject, StaffLike
+from neoscore.western.abstract_staff import AbstractStaff
+from neoscore.western.multi_staff_object import MultiStaffObject
 
 
 class SystemLine(MultiStaffObject, MusicPath):
@@ -20,7 +21,7 @@ class SystemLine(MultiStaffObject, MusicPath):
     def __init__(
         self,
         pos_x: Unit,
-        staves: list[StaffLike],
+        staves: list[AbstractStaff],
         font: Optional[MusicFont] = None,
         pen: Optional[PenDef] = None,
     ):
